@@ -10,20 +10,29 @@
 export interface NetworkConfig {
   /** CAIP-2 style id, e.g. "sui:testnet" */
   id: string;
-  rpcUrl: string;
+  /**
+   * Failover list, first = primary. Comma-separated in env. Defaults stay
+   * OFFICIAL-ONLY on purpose: verification trusts the RPC's answers (dry-run
+   * results, balance changes, digest lookups), so a malicious endpoint could
+   * falsely validate a payment — only add endpoints you trust.
+   */
+  rpcUrls: string[];
   /** Canonical USDC coin type, advertised in /supported as a courtesy. */
   usdc: string;
 }
 
+const urls = (env: string | undefined, fallback: string) =>
+  (env ?? fallback).split(",").map((s) => s.trim()).filter(Boolean);
+
 const TESTNET: NetworkConfig = {
   id: "sui:testnet",
-  rpcUrl: process.env.SUI_TESTNET_RPC ?? "https://fullnode.testnet.sui.io:443",
+  rpcUrls: urls(process.env.SUI_TESTNET_RPC, "https://fullnode.testnet.sui.io:443"),
   usdc: "0xa1ec7fc00a6f40db9693ad1415d0c193ad3906494428cf252621037bd7117e29::usdc::USDC",
 };
 
 const MAINNET: NetworkConfig = {
   id: "sui:mainnet",
-  rpcUrl: process.env.SUI_MAINNET_RPC ?? "https://fullnode.mainnet.sui.io:443",
+  rpcUrls: urls(process.env.SUI_MAINNET_RPC, "https://fullnode.mainnet.sui.io:443"),
   usdc: "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC",
 };
 

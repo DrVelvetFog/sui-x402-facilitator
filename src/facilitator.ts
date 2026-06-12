@@ -14,17 +14,17 @@
  * ⇒ same digest), with the in-flight promise cached so concurrent settles of
  * the same payment collapse into one broadcast.
  */
-import { SuiJsonRpcClient } from "@mysten/sui/jsonRpc";
 import { TransactionDataBuilder } from "@mysten/sui/transactions";
 import { verifyTransactionSignature } from "@mysten/sui/verify";
 import { fromBase64, normalizeStructTag, normalizeSuiAddress } from "@mysten/sui/utils";
 import { NETWORKS, networkById, type NetworkConfig } from "./config.js";
+import { FailoverRpc } from "./rpc.js";
 import { ERR, type PaymentRequirements, type SettleResponse, type VerifySettleRequest, type VerifyResponse } from "./x402.js";
 
-const clients = new Map<string, SuiJsonRpcClient>();
-function rpc(net: NetworkConfig): SuiJsonRpcClient {
+const clients = new Map<string, FailoverRpc>();
+function rpc(net: NetworkConfig): FailoverRpc {
   let c = clients.get(net.id);
-  if (!c) { c = new SuiJsonRpcClient({ url: net.rpcUrl, network: net.id.split(":")[1] }); clients.set(net.id, c); }
+  if (!c) { c = new FailoverRpc(net.rpcUrls, net.id.split(":")[1]); clients.set(net.id, c); }
   return c;
 }
 

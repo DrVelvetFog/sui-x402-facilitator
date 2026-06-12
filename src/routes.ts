@@ -43,6 +43,8 @@ export function facilitatorInfo() {
     service: "sui-x402-facilitator",
     networks: NETWORKS.map((n) => n.id),
     custody: "none — relays the payer's own signed transaction",
+    fees: "none",
+    terms: "https://github.com/DrVelvetFog/sui-x402-facilitator/blob/main/TERMS.md",
   };
 }
 

@@ -49,7 +49,7 @@ and read free; agents pay per call.*
 | network | status | USDC (Circle, 6 decimals) |
 |---|---|---|
 | `sui:testnet` | live | `0xa1ec…7e29::usdc::USDC` |
-| `sui:mainnet` | off until hardening pass (`ENABLE_MAINNET=1`) | `0xdba3…00e7::usdc::USDC` |
+| `sui:mainnet` | hardened, rolling out (`ENABLE_MAINNET=1`) | `0xdba3…00e7::usdc::USDC` |
 
 The facilitator is asset-agnostic: it enforces whatever coin type the
 `PaymentRequirements.asset` names (USDC, SUI, anything `0x2::coin::Coin<T>`).
@@ -107,7 +107,17 @@ ASSET=USDC npm run e2e # payer needs Circle testnet USDC: https://faucet.circle.
 The e2e covers the happy path (verify → settle → recipient balance up),
 tampered signature, recipient mismatch, underpayment, double-settle
 idempotency, and spent-payment re-verification — 12 checks, all against real
-testnet broadcasts.
+testnet broadcasts. `npm run stress` adds concurrency races: 12 simultaneous
+settles of one payment credit the recipient exactly once (single broadcast).
+
+## Reliability
+
+`SUI_TESTNET_RPC` / `SUI_MAINNET_RPC` accept a **comma-separated failover
+list** (first = primary). Calls retry across endpoints on transport failures
+(network error, timeout, 5xx, 429) but not on deterministic JSON-RPC errors —
+an honest node returns the same protocol answer everywhere. Defaults are
+official fullnodes only: verification trusts the RPC's answers, so only add
+endpoints you trust.
 
 ## Config
 
@@ -115,9 +125,15 @@ testnet broadcasts.
 |---|---|---|
 | `PORT` | `4402` | |
 | `ENABLE_MAINNET` | unset | `1` adds `sui:mainnet` |
-| `SUI_TESTNET_RPC` | `https://fullnode.testnet.sui.io:443` | |
-| `SUI_MAINNET_RPC` | `https://fullnode.mainnet.sui.io:443` | |
+| `SUI_TESTNET_RPC` | `https://fullnode.testnet.sui.io:443` | comma-separated failover list |
+| `SUI_MAINNET_RPC` | `https://fullnode.mainnet.sui.io:443` | comma-separated failover list |
+| `RPC_TIMEOUT_MS` | `20000` | per-call timeout before failover |
 | `RATE_LIMIT` | `120` | requests per IP per minute |
+
+## Custody & terms
+
+Non-custodial, zero fees: the service holds no keys and relays the payer's own
+signed transaction — it cannot redirect funds. See [TERMS.md](TERMS.md).
 
 ## License
 
