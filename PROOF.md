@@ -3,16 +3,17 @@
 Verify any testnet digest at `https://testnet.suivision.xyz/txblock/<digest>`
 and any mainnet digest at `https://suivision.xyz/txblock/<digest>`.
 
-## 🟢 MAINNET — the first x402 payment settled on Sui mainnet
+## 🟢 MAINNET — the first x402 payments settled on Sui mainnet
 
-Real Circle USDC, real mainnet broadcast, 2026-06-12:
+Real Circle USDC, real mainnet broadcasts, 2026-06-12:
 
-| | |
-|---|---|
-| settlement digest | [`49z1am7SpkN16XGSGBowBdCAzzPQQK7ffeqekrwandQL`](https://suivision.xyz/txblock/49z1am7SpkN16XGSGBowBdCAzzPQQK7ffeqekrwandQL) |
-| network | `sui:mainnet` |
-| amount | $0.01 USDC (`0xdba3…00e7::usdc::USDC`) |
-| flow | `/verify` → `/settle`, payer-signed transaction relayed verbatim |
+| | digest | route |
+|---|---|---|
+| through the **live service** | [`HenUMqpDgdiAo9CsYc4mcoPpZYFMxDH8YVgEnVtAr5B9`](https://suivision.xyz/txblock/HenUMqpDgdiAo9CsYc4mcoPpZYFMxDH8YVgEnVtAr5B9) | https://sui-facilitator.onrender.com |
+| first mainnet settlement | [`49z1am7SpkN16XGSGBowBdCAzzPQQK7ffeqekrwandQL`](https://suivision.xyz/txblock/49z1am7SpkN16XGSGBowBdCAzzPQQK7ffeqekrwandQL) | local instance, mainnet RPC |
+
+Both: $0.01 USDC (`0xdba3…00e7::usdc::USDC`), `/verify` → `/settle`,
+payer-signed transaction relayed verbatim, funds returned to the payer.
 
 ## Production — live service (testnet demo)
 
