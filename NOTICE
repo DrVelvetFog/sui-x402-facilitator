@@ -1,0 +1,5 @@
+sui-x402-facilitator
+Copyright 2026 UIG Studios LLC
+
+The first live x402 facilitator settling on Sui. Implements the x402 v2
+facilitator API for the Sui `exact` scheme (x402-foundation/x402).
