@@ -1,10 +1,20 @@
 # Proof: the first x402 payments settled on Sui
 
-All transactions below are on `sui:testnet`, broadcast by this facilitator
-from payments signed by an independent payer wallet. Verify any digest at
-`https://testnet.suivision.xyz/txblock/<digest>`.
+Verify any testnet digest at `https://testnet.suivision.xyz/txblock/<digest>`
+and any mainnet digest at `https://suivision.xyz/txblock/<digest>`.
 
-## Production — live service
+## 🟢 MAINNET — the first x402 payment settled on Sui mainnet
+
+Real Circle USDC, real mainnet broadcast, 2026-06-12:
+
+| | |
+|---|---|
+| settlement digest | [`49z1am7SpkN16XGSGBowBdCAzzPQQK7ffeqekrwandQL`](https://suivision.xyz/txblock/49z1am7SpkN16XGSGBowBdCAzzPQQK7ffeqekrwandQL) |
+| network | `sui:mainnet` |
+| amount | $0.01 USDC (`0xdba3…00e7::usdc::USDC`) |
+| flow | `/verify` → `/settle`, payer-signed transaction relayed verbatim |
+
+## Production — live service (testnet demo)
 
 **The facilitator is live at https://sui-facilitator.onrender.com**
 (`GET /supported` advertises `sui:testnet` / `exact`). First payment through

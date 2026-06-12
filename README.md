@@ -49,7 +49,7 @@ and read free; agents pay per call.*
 | network | status | USDC (Circle, 6 decimals) |
 |---|---|---|
 | `sui:testnet` | live | `0xa1ec…7e29::usdc::USDC` |
-| `sui:mainnet` | hardened, rolling out (`ENABLE_MAINNET=1`) | `0xdba3…00e7::usdc::USDC` |
+| `sui:mainnet` | live — first payment settled 2026-06-12 ([PROOF.md](PROOF.md)) | `0xdba3…00e7::usdc::USDC` |
 
 The facilitator is asset-agnostic: it enforces whatever coin type the
 `PaymentRequirements.asset` names (USDC, SUI, anything `0x2::coin::Coin<T>`).
