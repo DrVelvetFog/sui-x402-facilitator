@@ -25,6 +25,24 @@ GET  /health
 Semantic failures return HTTP 200 with `isValid: false` / `success: false` and
 a spec §9 reason code; 400 is reserved for unparseable bodies.
 
+### Optional gas station (sponsored payments)
+
+When `ENOKI_KEY` is set, two extra routes let a payer with **no SUI for gas**
+still pay, via an [Enoki](https://docs.enoki.mystenlabs.com) sponsor:
+
+```
+POST /gas-station          { sender, transactionKindBytes, network, recipients? } -> { bytes, digest }
+POST /gas-station/execute  { digest, signature } -> { digest }
+```
+
+The payer builds the payment as a transaction *kind* (no gas), `/gas-station`
+fills the gas and returns the full bytes, the payer signs them, and
+`/gas-station/execute` adds the sponsor signature and broadcasts. **The sponsor
+key pays gas only** — the payment coin lives in the payer-signed bytes, the
+sponsor signs the *same* bytes, so it still cannot redirect funds. `recipients`
+are allow-listed so the sponsored tx can only pay the payees the caller
+declares. Both routes are absent (404) unless `ENOKI_KEY` is configured.
+
 ## Live demo — agents pay, verified humans read free
 
 The hosted service also exposes a demo resource:
@@ -110,6 +128,11 @@ idempotency, and spent-payment re-verification — 12 checks, all against real
 testnet broadcasts. `npm run stress` adds concurrency races: 12 simultaneous
 settles of one payment credit the recipient exactly once (single broadcast).
 
+With `ENOKI_KEY` set (in `.env`), the gas station has its own tests:
+`tsx scripts/enoki-test.ts` (one-call sponsorship probe) and
+`tsx scripts/sponsored-e2e.ts` (full build → sponsor → sign → execute loop,
+proving the payer pays zero gas).
+
 ## Reliability
 
 `SUI_TESTNET_RPC` / `SUI_MAINNET_RPC` accept a **comma-separated failover
@@ -129,6 +152,8 @@ endpoints you trust.
 | `SUI_MAINNET_RPC` | `https://fullnode.mainnet.sui.io:443` | comma-separated failover list |
 | `RPC_TIMEOUT_MS` | `20000` | per-call timeout before failover |
 | `RATE_LIMIT` | `120` | requests per IP per minute |
+| `ENOKI_KEY` | unset | Enoki key; enables the gas-station routes (gas-only sponsor) |
+| `SPONSOR_DAILY_CAP` | `60` | max sponsored txs per sender per day |
 
 ## Custody & terms
 
