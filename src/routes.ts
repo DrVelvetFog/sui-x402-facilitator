@@ -33,6 +33,19 @@ function sponsorAllowed(addr: string): boolean {
   e.n++; return true;
 }
 
+// Global daily circuit breaker — the per-sender cap alone doesn't stop a swarm
+// of fresh addresses draining the mainnet sponsor wallet's gas. Bounds total
+// sponsored txs/day across all senders; tune SPONSOR_GLOBAL_DAILY_CAP per the
+// sponsor wallet's funded SUI before flipping the gas station to mainnet.
+const SPONSOR_GLOBAL_DAILY_CAP = Number(process.env.SPONSOR_GLOBAL_DAILY_CAP ?? 1000);
+let globalSponsor = { day: 0, n: 0 };
+function globalSponsorAllowed(): boolean {
+  const day = Math.floor(Date.now() / 86_400_000);
+  if (globalSponsor.day !== day) globalSponsor = { day, n: 0 };
+  if (globalSponsor.n >= SPONSOR_GLOBAL_DAILY_CAP) return false;
+  globalSponsor.n++; return true;
+}
+
 export function json(res: http.ServerResponse, code: number, body: unknown) {
   res.writeHead(code, {
     "content-type": "application/json",
@@ -100,6 +113,7 @@ export async function facilitatorRoutes(req: http.IncomingMessage, res: http.Ser
     const net = NETWORKS.find((n) => n.id === network);
     if (!net) { json(res, 400, { error: "unsupported network" }); return true; }
     if (!sponsorAllowed(sender)) { json(res, 429, { error: "daily sponsorship limit reached" }); return true; }
+    if (!globalSponsorAllowed()) { json(res, 503, { error: "sponsorship temporarily unavailable" }); return true; }
     // Allow-list the payer plus any declared payees so Enoki permits the payment
     // recipient. The caller scopes its own payees; gas spend is capped above.
     const allowed = [sender, ...(Array.isArray(recipients) ? recipients.filter((r: unknown) => typeof r === "string") : [])];
