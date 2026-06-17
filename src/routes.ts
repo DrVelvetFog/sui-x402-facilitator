@@ -12,12 +12,28 @@ const MAX_BODY = 256 * 1024; // signed Sui tx payloads are ~2–6 KB; be generou
 const RATE_LIMIT = Number(process.env.RATE_LIMIT ?? 120); // requests per IP per minute
 const buckets = new Map<string, { min: number; n: number }>();
 
+// Client IP = the LAST x-forwarded-for hop — the one our trusted proxy (Render)
+// appends from the real socket. Any client-supplied prefix is attacker-
+// controlled, so keying the limiter on xff[0] let an attacker bypass it by
+// rotating spoofed values. Fall back to the socket address off-platform.
+function clientIp(req: http.IncomingMessage): string {
+  const xff = req.headers["x-forwarded-for"];
+  if (typeof xff === "string" && xff.length) {
+    const hops = xff.split(",").map((s) => s.trim()).filter(Boolean);
+    if (hops.length) return hops[hops.length - 1];
+  }
+  return req.socket.remoteAddress ?? "?";
+}
+
 function rateLimited(ip: string): boolean {
   const min = Math.floor(Date.now() / 60_000);
   const b = buckets.get(ip);
-  if (!b || b.min !== min) { buckets.set(ip, { min, n: 1 }); return false; }
-  if (buckets.size > 50_000) buckets.clear();
-  return ++b.n > RATE_LIMIT;
+  if (b && b.min === min) return ++b.n > RATE_LIMIT;
+  // Evict the single oldest entry instead of clearing all — a full clear would
+  // reset every IP's count, so a swarm of fresh IPs could wipe the limiter.
+  if (buckets.size >= 50_000) { const o = buckets.keys().next().value; if (o !== undefined) buckets.delete(o); }
+  buckets.set(ip, { min, n: 1 });
+  return false;
 }
 
 // Per-sender daily cap on sponsorship — the gas station pays real gas, so an
@@ -27,10 +43,11 @@ const sponsorCount = new Map<string, { day: number; n: number }>();
 function sponsorAllowed(addr: string): boolean {
   const day = Math.floor(Date.now() / 86_400_000);
   const e = sponsorCount.get(addr);
-  if (!e || e.day !== day) { sponsorCount.set(addr, { day, n: 1 }); return true; }
-  if (sponsorCount.size > 50_000) sponsorCount.clear();
-  if (e.n >= SPONSOR_DAILY_CAP) return false;
-  e.n++; return true;
+  if (e && e.day === day) { if (e.n >= SPONSOR_DAILY_CAP) return false; e.n++; return true; }
+  // Evict oldest rather than clearing all (see rateLimited).
+  if (sponsorCount.size >= 50_000) { const o = sponsorCount.keys().next().value; if (o !== undefined) sponsorCount.delete(o); }
+  sponsorCount.set(addr, { day, n: 1 });
+  return true;
 }
 
 // Global daily circuit breaker — the per-sender cap alone doesn't stop a swarm
@@ -86,7 +103,7 @@ export async function facilitatorRoutes(req: http.IncomingMessage, res: http.Ser
     return true;
   }
   if (req.method === "POST" && (isVerify || isSettle)) {
-    const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ?? req.socket.remoteAddress ?? "?";
+    const ip = clientIp(req);
     if (rateLimited(ip)) { json(res, 429, { error: "rate limited" }); return true; }
     let body: any;
     try { body = await readBody(req); } catch {
@@ -102,7 +119,7 @@ export async function facilitatorRoutes(req: http.IncomingMessage, res: http.Ser
   // payment tx via Enoki so agents don't need SUI. Sponsor key pays gas only.
   if (req.method === "POST" && url.pathname === "/gas-station") {
     if (!sponsorshipEnabled()) { json(res, 503, { error: "sponsorship not configured" }); return true; }
-    const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ?? req.socket.remoteAddress ?? "?";
+    const ip = clientIp(req);
     if (rateLimited(ip)) { json(res, 429, { error: "rate limited" }); return true; }
     let body: any;
     try { body = await readBody(req); } catch { json(res, 400, { error: "invalid_payload" }); return true; }
@@ -129,7 +146,7 @@ export async function facilitatorRoutes(req: http.IncomingMessage, res: http.Ser
   // signature it already holds for `digest` and broadcasts. Key pays gas only.
   if (req.method === "POST" && url.pathname === "/gas-station/execute") {
     if (!sponsorshipEnabled()) { json(res, 503, { error: "sponsorship not configured" }); return true; }
-    const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ?? req.socket.remoteAddress ?? "?";
+    const ip = clientIp(req);
     if (rateLimited(ip)) { json(res, 429, { error: "rate limited" }); return true; }
     let body: any;
     try { body = await readBody(req); } catch { json(res, 400, { error: "invalid_payload" }); return true; }

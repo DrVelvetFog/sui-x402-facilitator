@@ -165,10 +165,15 @@ const settled = new Map<string, Promise<SettleResponse>>();
 
 export async function settle(body: VerifySettleRequest): Promise<SettleResponse> {
   const network = body?.paymentRequirements?.network ?? "";
-  const key = body?.paymentPayload?.payload?.transaction;
-  if (typeof key !== "string" || key.length === 0) {
+  const rawTx = body?.paymentPayload?.payload?.transaction;
+  if (typeof rawTx !== "string" || rawTx.length === 0) {
     return { success: false, errorReason: ERR.invalidPayload, transaction: "", network };
   }
+  // Idempotency key = the 32-byte tx digest, not the full base64 (≤120 KB):
+  // same bytes ⇒ same digest, and the small key bounds cache memory.
+  let key: string;
+  try { key = TransactionDataBuilder.getDigestFromBytes(fromBase64(rawTx)); }
+  catch { return { success: false, errorReason: ERR.invalidPayload, transaction: "", network }; }
   const hit = settled.get(key);
   if (hit) return hit;
 
