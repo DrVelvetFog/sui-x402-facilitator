@@ -1,9 +1,9 @@
-# Proof: the first x402 payments settled on Sui
+# Proof: x402 payments settled on Sui
 
 Verify any testnet digest at `https://testnet.suivision.xyz/txblock/<digest>`
 and any mainnet digest at `https://suivision.xyz/txblock/<digest>`.
 
-## 🟢 MAINNET — the first x402 payments settled on Sui mainnet
+## 🟢 MAINNET — x402 payments settled on Sui mainnet
 
 Real Circle USDC, real mainnet broadcasts, 2026-06-12:
 

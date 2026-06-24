@@ -1,6 +1,6 @@
 # sui-x402-facilitator
 
-**The first live [x402](https://docs.x402.org) facilitator that settles on Sui.**
+**A non-custodial [x402](https://docs.x402.org) facilitator that settles on Sui, live on mainnet + testnet.**
 
 Live service: **https://sui-facilitator.onrender.com** · on-chain proof: [PROOF.md](PROOF.md)
 
