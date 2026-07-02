@@ -1,0 +1,32 @@
+{
+  "alg": "ES256",
+  "backLink": {
+    "attestationDigest": "sha256:2f6e3319ad0238b0a0824e7e80efc3792bdfd592199bc96b29e59d802e92fdd3",
+    "attestationNonce": "x402-generic-0"
+  },
+  "decisionDerived": {
+    "decidedAt": "2026-06-17T10:00:00Z",
+    "decision": "allow",
+    "evidenceRef": {
+      "canonicalization": "JCS",
+      "digest": "sha256:8e3e2226bb5954e8696aa189369f18249749d4f91b3c4402f48c4debcb147547",
+      "ref": "x402:action_ref/sha256:638c16ea5d1d79e75878d860c90e2a84417c9496404ccb867fdecd9f2aa76709",
+      "schema": "x402.settlement/v0"
+    },
+    "policyId": "policy:x402-fulfillment/1",
+    "reason": "agent acted within the authorized scope of the settled order",
+    "riskScore": "0.10",
+    "thresholdAllow": "0.30",
+    "thresholdBlock": "0.80"
+  },
+  "issuerAsserted": {
+    "alg": "ES256",
+    "iat": "2026-06-17T10:00:00Z",
+    "iss": "issuer://merchant-gateway",
+    "nonce": "d-generic-0",
+    "secretVersion": "v1",
+    "sub": "agent:checkout-bot"
+  },
+  "signature": "df3f86565807f53207f481880dff6d38985c65de57b32cca62bf26128751de0828dea479f774d6a6ef2a2c8750dfd730344394e40373fd14d56f400702fe0daf",
+  "version": 1
+}

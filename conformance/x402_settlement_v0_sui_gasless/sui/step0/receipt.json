@@ -1,0 +1,32 @@
+{
+  "alg": "ES256",
+  "backLink": {
+    "attestationDigest": "sha256:86b695bf64c98b45bccc65750cda008918bd776e03a1fe300cd5f621f4ec27e1",
+    "attestationNonce": "x402-sui-gasless-0"
+  },
+  "decisionDerived": {
+    "decidedAt": "2026-07-02T00:00:00Z",
+    "decision": "allow",
+    "evidenceRef": {
+      "canonicalization": "JCS",
+      "digest": "sha256:ec94a363cddcaa591f38ae9ada2e91d67b7be5b5c99261bf1190e32927878982",
+      "ref": "x402:action_ref/sha256:a0f241e92370e24eed3e0575c3258cb1d599b6308946bbf58b937cf0b1d493c3",
+      "schema": "x402.settlement.sui/v0"
+    },
+    "policyId": "policy:x402-fulfillment/1",
+    "reason": "gasless Address-Balance payment settled and recomputed from chain",
+    "riskScore": "0.10",
+    "thresholdAllow": "0.30",
+    "thresholdBlock": "0.80"
+  },
+  "issuerAsserted": {
+    "alg": "ES256",
+    "iat": "2026-07-02T00:00:00Z",
+    "iss": "issuer://sui-facilitator-crosscheck",
+    "nonce": "d-sui-gasless-0",
+    "secretVersion": "v1",
+    "sub": "agent:sui-gasless-crosscheck"
+  },
+  "signature": "73f1337ff245aaa33ab1ece5b2d500a5100cc61996dea4a2ef001d42b5b6683965cd100f3cb8181eceed08e754b35151506bc61b0bf29abae77960afa9bc0188",
+  "version": 1
+}
