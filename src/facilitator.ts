@@ -109,7 +109,9 @@ async function verifyCore(body: VerifySettleRequest, opts: { skipExecutedCheck?:
   // bytes; if the chain already knows it, this payment is used up.
   if (!opts.skipExecutedCheck) {
     const digest = TransactionDataBuilder.getDigestFromBytes(txBytes);
-    const known = await client.getTransactionBlock({ digest }).catch(() => null);
+    // null = never committed (gRPC NOT_FOUND); a transport error THROWS and
+    // fails verify closed — we must not pass a payment we couldn't check.
+    const known = await client.getTransactionBlock({ digest });
     if (known) throw new Invalid(ERR.invalidTxState, undefined, `already executed: ${digest}`);
   }
 
@@ -186,9 +188,10 @@ export async function settle(body: VerifySettleRequest): Promise<SettleResponse>
       // the payment already on-chain and gets the original outcome back
       // instead of an error — reconstructed from execution truth.
       const digest = TransactionDataBuilder.getDigestFromBytes(txBytes);
-      const prior = await client.getTransactionBlock({
-        digest, options: { showEffects: true, showBalanceChanges: true, showInput: true },
-      }).catch(() => null);
+      // null = not yet on-chain (gRPC NOT_FOUND); a transport error THROWS to
+      // the outer catch (fail closed) rather than reading as "no prior" and
+      // risking a double broadcast.
+      const prior = await client.getTransactionBlock({ digest });
       if (prior) {
         console.log(`settle: ${digest} already on-chain — returning prior result`);
         return executedResult(prior, req, net.id);
@@ -199,7 +202,6 @@ export async function settle(body: VerifySettleRequest): Promise<SettleResponse>
       const r = await client.executeTransactionBlock({
         transactionBlock: txBytes,
         signature,
-        options: { showEffects: true, showBalanceChanges: true },
       });
       await client.waitForTransaction({ digest: r.digest, timeout: req.maxTimeoutSeconds > 0 ? req.maxTimeoutSeconds * 1000 : 60_000 });
       if (r.effects?.status?.status !== "success") {

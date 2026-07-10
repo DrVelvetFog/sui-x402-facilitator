@@ -19,8 +19,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { SuiJsonRpcClient } from "@mysten/sui/jsonRpc";
 import { SuiGrpcClient } from "@mysten/sui/grpc";
+import { FailoverRpc } from "../src/rpc.js";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { Transaction } from "@mysten/sui/transactions";
 import { toBase64 } from "@mysten/sui/utils";
@@ -107,7 +107,13 @@ function netByAddress(balanceChanges: any[], asset: string): Map<string, bigint>
 }
 
 async function main() {
-  const client = new SuiJsonRpcClient({ url: RPC, network: "testnet" });
+  // Independent on-chain reads over gRPC (JSON-RPC retired). getBalance reads
+  // `.balance`; the tx recompute reuses the migrated FailoverRpc adapter for the
+  // `owner.AddressOwner` balanceChange shape, plus a raw read for gasData.
+  const grpc = new SuiGrpcClient({ network: "testnet", baseUrl: RPC } as never);
+  const rpc = new FailoverRpc([RPC], "testnet");
+  const getBalance = async (owner: string, coinType: string) =>
+    BigInt((await grpc.getBalance({ owner, coinType } as never) as any).balance.balance);
   const payer = keypair("e2e-payer");
   const seller = keypair("e2e-seller");
   const payerAddr = payer.toSuiAddress();
@@ -134,25 +140,26 @@ async function main() {
 
   // 3. settle through this facilitator
   console.log("— /settle");
-  const usdcBefore = BigInt((await client.getBalance({ owner: sellerAddr, coinType: ASSET })).totalBalance);
+  const usdcBefore = await getBalance(sellerAddr, ASSET);
   const s = await post("/settle", requestBody(payload, sellerAddr));
   console.log(`  success=${s.success} digest=${s.transaction ?? "-"} amount=${s.amount ?? "-"}`);
   if (!s.success || !s.transaction) throw new Error(`settle failed: ${JSON.stringify(s)}`);
-  await client.waitForTransaction({ digest: s.transaction });
+  await rpc.waitForTransaction({ digest: s.transaction });
 
-  // 4. RECOMPUTE from chain data alone
-  console.log("— recompute from chain (getTransactionBlock, showBalanceChanges/showEffects/showInput)");
-  const tb = await client.getTransactionBlock({
-    digest: s.transaction,
-    options: { showBalanceChanges: true, showEffects: true, showInput: true },
-  });
+  // 4. RECOMPUTE from chain data alone (gRPC: FailoverRpc adapter for the
+  // balanceChange shape + a raw read for gasData)
+  console.log("— recompute from chain (gRPC getTransaction, balanceChanges + gasData)");
+  const tbAdapted = await rpc.getTransactionBlock({ digest: s.transaction });
+  const tbRaw: any = await grpc.getTransaction({ digest: s.transaction, include: { transaction: true } as never });
+  const tbTx = tbRaw.$kind === "Transaction" ? tbRaw.Transaction : tbRaw.FailedTransaction;
+  const tb = { balanceChanges: (tbAdapted as any)?.balanceChanges ?? [], transaction: { data: { gasData: tbTx?.transaction?.gasData } } };
   const net = netByAddress(tb.balanceChanges as any[], ASSET);
   const payToDelta = net.get(sellerAddr.toLowerCase()) ?? 0n;
   const payerDelta = net.get(payerAddr.toLowerCase()) ?? 0n;
   const suiNet = netByAddress(tb.balanceChanges as any[], SUI);
   const payerSuiDelta = ASSET === SUI ? payerDelta : (suiNet.get(payerAddr.toLowerCase()) ?? 0n);
   const chainGas = (tb.transaction as any)?.data?.gasData;
-  const usdcAfter = BigInt((await client.getBalance({ owner: sellerAddr, coinType: ASSET })).totalBalance);
+  const usdcAfter = await getBalance(sellerAddr, ASSET);
 
   const checks: [string, boolean, string][] = [
     ["payTo credited EXACTLY amount", payToDelta === AMOUNT, `${payToDelta} vs ${AMOUNT}`],
@@ -169,6 +176,24 @@ async function main() {
     console.log(`  ${pass ? "✓" : "✗"} ${name} — ${detail}`);
     ok = ok && pass;
   }
+
+  // 5. idempotency: re-settle the SAME payment. The facilitator's executed-first
+  // getTransactionBlock check now hits the just-committed tx and returns the
+  // original digest WITHOUT re-broadcasting — exercises the getTransaction
+  // adapter on a real committed programmable tx (executedResult path).
+  console.log("\n— /settle again (idempotency)");
+  const s2 = await post("/settle", requestBody(payload, sellerAddr));
+  const idem = s2.success === true && s2.transaction === s.transaction;
+  console.log(`  ${idem ? "✓" : "✗"} idempotent re-settle — success=${s2.success} digest=${s2.transaction} same=${s2.transaction === s.transaction}`);
+  ok = ok && idem;
+
+  // 6. a tampered signature MUST be rejected at verify (fail closed)
+  console.log("— /verify tampered signature (must reject)");
+  const flip = payload.signature.slice(-6) === "AAAAAA" ? "BBBBBB" : "AAAAAA";
+  const vBad = await post("/verify", requestBody({ ...payload, signature: payload.signature.slice(0, -6) + flip }, sellerAddr));
+  const rejected = vBad.isValid === false;
+  console.log(`  ${rejected ? "✓" : "✗"} tampered rejected — isValid=${vBad.isValid} reason=${vBad.invalidReason ?? "-"}`);
+  ok = ok && rejected;
 
   console.log("\n================ #2616 paste-ready ================");
   console.log(`Ran a gasless Address-Balance ${ASSET === USDC ? "USDC" : "SUI"} payment through my independent Sui facilitator (the #2619 one), verify -> settle, and recomputed the settlement from chain alone:`);
