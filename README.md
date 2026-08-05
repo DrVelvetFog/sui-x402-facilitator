@@ -13,6 +13,25 @@ broadcast it verbatim (settle) — it holds no keys, never touches funds, and ha
 no way to redirect a payment: the payer signed the exact bytes being relayed.
 Zero fees.
 
+## Live demo — agents pay, verified humans read free
+
+The hosted service also exposes a demo resource:
+
+```sh
+curl -i https://sui-facilitator.onrender.com/signal/whales
+```
+
+returns `402 Payment Required` with a base64 `PAYMENT-REQUIRED` header
+($0.01 testnet USDC per call). Retry with a `PAYMENT-SIGNATURE` header carrying
+a signed Sui payment and you get the data plus a `PAYMENT-RESPONSE` settlement
+digest — an agent buying an API call on Sui rails.
+
+The same endpoint waives payment for wallets holding a
+[Proof of Real](https://por-proof-of-real.netlify.app) personhood credential
+(`POR-PROOF` header: a personal-message signature + on-chain credential check —
+see [`por-sdk`](https://www.npmjs.com/package/por-sdk)). *Humans verify once
+and read free; agents pay per call.*
+
 ## Endpoints
 
 ```
@@ -42,25 +61,6 @@ key pays gas only** — the payment coin lives in the payer-signed bytes, the
 sponsor signs the *same* bytes, so it still cannot redirect funds. `recipients`
 are allow-listed so the sponsored tx can only pay the payees the caller
 declares. Both routes are absent (404) unless `ENOKI_KEY` is configured.
-
-## Live demo — agents pay, verified humans read free
-
-The hosted service also exposes a demo resource:
-
-```sh
-curl -i https://sui-facilitator.onrender.com/signal/whales
-```
-
-returns `402 Payment Required` with a base64 `PAYMENT-REQUIRED` header
-($0.01 testnet USDC per call). Retry with a `PAYMENT-SIGNATURE` header carrying
-a signed Sui payment and you get the data plus a `PAYMENT-RESPONSE` settlement
-digest — an agent buying an API call on Sui rails.
-
-The same endpoint waives payment for wallets holding a
-[Proof of Real](https://por-proof-of-real.netlify.app) personhood credential
-(`POR-PROOF` header: a personal-message signature + on-chain credential check —
-see [`por-sdk`](https://www.npmjs.com/package/por-sdk)). *Humans verify once
-and read free; agents pay per call.*
 
 ## Networks & assets
 
