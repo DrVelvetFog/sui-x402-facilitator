@@ -41,13 +41,16 @@ function isDeterministic(err: any): boolean {
   const c = grpcCode(err);
   return c ? DETERMINISTIC.has(c) : false;
 }
-/** A tx-lookup MISS: the digest was never committed. Distinct from a transport
- * error, which must NOT read as "not executed" (that would let the replay guard
- * pass an already-settled payment). */
-function isNotFound(err: any): boolean {
+/** A tx-lookup MISS: the digest was never committed (or pruned from this
+ * node's retention). Two real shapes, verified live: the fullnode answers
+ * gRPC NOT_FOUND, and the SDK's own empty-response guard throws a plain
+ * `Transaction <digest> not found` Error with no code (grpc/core.ts). Only
+ * those — keyed to the digest we asked about — read as a miss. Anything else
+ * (proxy 404, retired-method error) must NOT read as "not executed": that
+ * would let the replay guard pass an already-settled payment. */
+function isTxNotFound(err: any, digest: string): boolean {
   if (grpcCode(err) === "NOT_FOUND") return true;
-  const m = err?.message;
-  return typeof m === "string" && /not found/i.test(m);
+  return err?.message === `Transaction ${digest} not found`;
 }
 
 // --- adapters: gRPC TransactionResult -> the JSON-RPC shapes facilitator.ts reads ---
@@ -111,7 +114,7 @@ export class FailoverRpc {
         balanceChanges: balanceChangesOf(tx),
       } as unknown as SuiTransactionBlockResponse;
     } catch (err) {
-      if (isNotFound(err)) return null;
+      if (isTxNotFound(err, input.digest)) return null;
       throw err;
     }
   }
