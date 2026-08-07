@@ -130,9 +130,13 @@ export class FailoverRpc {
   }
 
   async executeTransactionBlock(input: { transactionBlock: Uint8Array; signature: string }): Promise<SuiTransactionBlockResponse> {
-    // Re-broadcasting an already-executed gasless tx THROWS over gRPC (unlike
-    // JSON-RPC). settle() guards this with an executed-first getTransactionBlock
-    // check, so execute only runs for a not-yet-committed tx.
+    // Re-broadcasting an already-executed gasless tx over gRPC returns CACHED
+    // SUCCESS effects — no throw, no TransactionAlreadyExecuted (verified on
+    // testnet gRPC, both include masks; x402 #2615). So execute does NOT
+    // self-guard by erroring: settle()'s executed-first getTransactionBlock
+    // check is LOAD-BEARING — it dedups an already-committed digest before we
+    // call execute, so a replayed settle can't observe a fresh success and
+    // re-release the resource.
     const r = await this.run((c) => c.executeTransaction({
       transaction: input.transactionBlock,
       signatures: [input.signature],
