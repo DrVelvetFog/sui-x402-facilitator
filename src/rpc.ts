@@ -156,7 +156,7 @@ export class FailoverRpc {
   /** waitForTransaction has its own poll semantics — the gRPC client's native
    * wait shares the base CoreClient poll, so patience matches the old transport. */
   async waitForTransaction(input: { digest: string; timeout?: number }): Promise<SuiTransactionBlockResponse> {
-    const r = await this.run((c) => c.waitForTransaction({ digest: input.digest }));
+    const r = await this.run((c) => c.waitForTransaction({ digest: input.digest, timeout: input.timeout }));
     const tx = txOf(r);
     return { digest: tx.digest, effects: { status: statusOf(tx) } } as unknown as SuiTransactionBlockResponse;
   }

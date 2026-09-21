@@ -21,18 +21,23 @@ export interface NetworkConfig {
   usdc: string;
 }
 
-const urls = (env: string | undefined, fallback: string) =>
-  (env ?? fallback).split(",").map((s) => s.trim()).filter(Boolean);
+// A declared-but-blank variable (a common platform mistake) must fail at
+// startup, not leave a network advertised with no RPC behind it.
+function urls(name: string, fallback: string): string[] {
+  const list = (process.env[name] ?? fallback).split(",").map((s) => s.trim()).filter(Boolean);
+  if (list.length === 0) throw new Error(`${name} is set but lists no RPC URLs`);
+  return list;
+}
 
 const TESTNET: NetworkConfig = {
   id: "sui:testnet",
-  rpcUrls: urls(process.env.SUI_TESTNET_RPC, "https://fullnode.testnet.sui.io:443"),
+  rpcUrls: urls("SUI_TESTNET_RPC", "https://fullnode.testnet.sui.io:443"),
   usdc: "0xa1ec7fc00a6f40db9693ad1415d0c193ad3906494428cf252621037bd7117e29::usdc::USDC",
 };
 
 const MAINNET: NetworkConfig = {
   id: "sui:mainnet",
-  rpcUrls: urls(process.env.SUI_MAINNET_RPC, "https://fullnode.mainnet.sui.io:443"),
+  rpcUrls: urls("SUI_MAINNET_RPC", "https://fullnode.mainnet.sui.io:443"),
   usdc: "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC",
 };
 

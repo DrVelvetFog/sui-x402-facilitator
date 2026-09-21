@@ -9,7 +9,15 @@ import { settle, supported, verify } from "./facilitator.js";
 import { sponsor, executeSponsored, sponsorshipEnabled } from "./enoki.js";
 
 const MAX_BODY = 256 * 1024; // signed Sui tx payloads are ~2–6 KB; be generous
-const RATE_LIMIT = Number(process.env.RATE_LIMIT ?? 120); // requests per IP per minute
+// A typo like "1,000" makes Number() return NaN, and every `> NaN` check is
+// false — the limit would silently vanish. Refuse to start instead.
+function positiveLimit(name: string, fallback: number): number {
+  const v = Number(process.env[name] ?? fallback);
+  if (!Number.isFinite(v) || v <= 0) throw new Error(`${name} must be a positive number`);
+  return v;
+}
+
+const RATE_LIMIT = positiveLimit("RATE_LIMIT", 120); // requests per IP per minute
 const buckets = new Map<string, { min: number; n: number }>();
 
 // Client IP = the LAST x-forwarded-for hop — the one our trusted proxy (Render)
@@ -38,7 +46,7 @@ function rateLimited(ip: string): boolean {
 
 // Per-sender daily cap on sponsorship — the gas station pays real gas, so an
 // open endpoint is a free-gas faucet without this. Mirrors the Acre control.
-const SPONSOR_DAILY_CAP = Number(process.env.SPONSOR_DAILY_CAP ?? 60);
+const SPONSOR_DAILY_CAP = positiveLimit("SPONSOR_DAILY_CAP", 60);
 const sponsorCount = new Map<string, { day: number; n: number }>();
 function sponsorAllowed(addr: string): boolean {
   const day = Math.floor(Date.now() / 86_400_000);
@@ -54,7 +62,7 @@ function sponsorAllowed(addr: string): boolean {
 // of fresh addresses draining the mainnet sponsor wallet's gas. Bounds total
 // sponsored txs/day across all senders; tune SPONSOR_GLOBAL_DAILY_CAP per the
 // sponsor wallet's funded SUI before flipping the gas station to mainnet.
-const SPONSOR_GLOBAL_DAILY_CAP = Number(process.env.SPONSOR_GLOBAL_DAILY_CAP ?? 1000);
+const SPONSOR_GLOBAL_DAILY_CAP = positiveLimit("SPONSOR_GLOBAL_DAILY_CAP", 1000);
 let globalSponsor = { day: 0, n: 0 };
 function globalSponsorAllowed(): boolean {
   const day = Math.floor(Date.now() / 86_400_000);

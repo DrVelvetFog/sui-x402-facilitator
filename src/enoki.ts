@@ -51,6 +51,6 @@ export async function sponsor(
 
 /** Add the sponsor signature to a sponsored tx and broadcast it. */
 export async function executeSponsored(digest: string, signature: string): Promise<string> {
-  const d = await enoki(`/transaction-blocks/sponsor/${digest}`, { signature });
+  const d = await enoki(`/transaction-blocks/sponsor/${encodeURIComponent(digest)}`, { signature });
   return d.digest ?? digest;
 }

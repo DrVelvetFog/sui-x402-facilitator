@@ -171,14 +171,27 @@ export async function settle(body: VerifySettleRequest): Promise<SettleResponse>
   if (typeof rawTx !== "string" || rawTx.length === 0) {
     return { success: false, errorReason: ERR.invalidPayload, transaction: "", network };
   }
-  // Idempotency key = the 32-byte tx digest, not the full base64 (≤120 KB):
-  // same bytes ⇒ same digest, and the small key bounds cache memory.
-  let key: string;
-  try { key = TransactionDataBuilder.getDigestFromBytes(fromBase64(rawTx)); }
-  catch { return { success: false, errorReason: ERR.invalidPayload, transaction: "", network }; }
-  const hit = settled.get(key);
+  // Idempotency key = the 32-byte tx digest (not the full base64, ≤120 KB)
+  // PLUS the terms it settles against. A digest alone would hand one seller's
+  // cached success to a second seller presenting the same signed bytes, since
+  // the response carries no payTo. Only structurally valid requests are keyed;
+  // a structural rejection is reported by run() and never cached.
+  let key: string | undefined;
+  try {
+    const { req, net, txBytes } = checkStructure(body);
+    key = [
+      TransactionDataBuilder.getDigestFromBytes(txBytes),
+      net.id,
+      normalizeSuiAddress(req.payTo),
+      normalizeStructTag(req.asset),
+      BigInt(req.amount).toString(),
+    ].join("|");
+  } catch { /* run() returns the structural error */ }
+  const hit = key === undefined ? undefined : settled.get(key);
   if (hit) return hit;
 
+  // Set once the tx is broadcast, so a later failure can still report it.
+  let broadcastDigest = "";
   const run = (async (): Promise<SettleResponse> => {
     try {
       const { req, net, txBytes } = checkStructure(body);
@@ -203,6 +216,7 @@ export async function settle(body: VerifySettleRequest): Promise<SettleResponse>
         transactionBlock: txBytes,
         signature,
       });
+      broadcastDigest = r.digest;
       await client.waitForTransaction({ digest: r.digest, timeout: req.maxTimeoutSeconds > 0 ? req.maxTimeoutSeconds * 1000 : 60_000 });
       if (r.effects?.status?.status !== "success") {
         console.log(`settle failed on-chain ${r.digest}: ${r.effects?.status?.error}`);
@@ -222,10 +236,13 @@ export async function settle(body: VerifySettleRequest): Promise<SettleResponse>
         return { success: false, errorReason: e.reason, ...(e.payer ? { payer: e.payer } : {}), transaction: "", network };
       }
       console.error("settle error:", e);
-      return { success: false, errorReason: ERR.unexpectedSettle, transaction: "", network };
+      // After a broadcast the payment may have landed: return its digest so the
+      // seller can reconcile instead of reading the request as unpaid.
+      return { success: false, errorReason: ERR.unexpectedSettle, transaction: broadcastDigest, network };
     }
   })();
 
+  if (key === undefined) return run;
   settled.set(key, run);
   if (settled.size > SETTLE_CACHE_MAX) {
     const oldest = settled.keys().next().value;
@@ -233,8 +250,12 @@ export async function settle(body: VerifySettleRequest): Promise<SettleResponse>
   }
   const result = await run;
   // A rejection that never broadcast isn't a settlement — let the client fix
-  // the payment and retry with the same bytes (e.g. after topping up gas).
-  if (!result.success && result.transaction === "") settled.delete(key);
+  // the payment and retry with the same bytes (e.g. after topping up gas). An
+  // unexpected error isn't final either: a retry takes the durable path and
+  // rebuilds the outcome from chain.
+  if (!result.success && (result.transaction === "" || result.errorReason === ERR.unexpectedSettle)) {
+    settled.delete(key);
+  }
   return result;
 }
 
