@@ -60,7 +60,11 @@ fills the gas and returns the full bytes, the payer signs them, and
 key pays gas only** — the payment coin lives in the payer-signed bytes, the
 sponsor signs the *same* bytes, so it still cannot redirect funds. `recipients`
 are allow-listed so the sponsored tx can only pay the payees the caller
-declares. Both routes are absent (404) unless `ENOKI_KEY` is configured.
+declares. Both routes return `503 {"error":"sponsorship not configured"}` unless
+`ENOKI_KEY` is configured, and it isn't on the hosted instance. Sponsored
+payments aren't accepted through `/verify` and `/settle`: `/verify` rejects a
+transaction whose gas owner isn't the sender, since `/settle` only broadcasts the
+payer's signature.
 
 ## Networks & assets
 

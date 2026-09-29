@@ -101,6 +101,22 @@ function checkStructure(body: VerifySettleRequest): { req: PaymentRequirements; 
  */
 async function verifyCore(body: VerifySettleRequest, opts: { skipExecutedCheck?: boolean } = {}): Promise<{ payer: string; received: bigint; net: NetworkConfig; txBytes: Uint8Array; signature: string; req: PaymentRequirements }> {
   const { req, net, txBytes, signature } = checkStructure(body);
+
+  // Sponsored transactions (gas owned by someone other than the sender) need
+  // the sponsor's signature too, and settle broadcasts only the payer's. Such a
+  // payment would verify and then fail to settle, so refuse it here.
+  let sender: string | null, gasOwner: string | null;
+  try {
+    const data = TransactionDataBuilder.fromBytes(txBytes);
+    sender = data.sender;
+    gasOwner = data.gasData.owner;
+  } catch {
+    throw new Invalid(ERR.invalidPayload);
+  }
+  if (sender && gasOwner && normalizeSuiAddress(gasOwner) !== normalizeSuiAddress(sender)) {
+    throw new Invalid(ERR.invalidPayload, sender, "sponsored transactions are not supported");
+  }
+
   const client = rpc(net);
 
   // Scheme spec step 3 ("not already executed"): dry-run alone can't catch
